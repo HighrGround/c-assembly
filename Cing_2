@@ -1,0 +1,170 @@
+#include <stdio.h>
+
+//this program is made to show how a huffman compression engine may work in a basic version 
+//also as something to refer to when working with application layer stuff 
+
+// A structure to represent a node in the Huffman tree
+struct Node {
+    char data; // The character
+    unsigned freq; // The frequency
+    struct Node *left, *right; // The left and right child
+};
+
+// A structure to represent a min heap or a priority queue
+struct MinHeap {
+    unsigned size; // The current size of the heap
+    unsigned capacity; // The maximum capacity of the heap
+    struct Node** array; // An array of node pointers
+};
+
+// A utility function to create a new node with the given data and frequency
+struct Node* newNode(char data, unsigned freq)
+{
+    struct Node* temp = (struct Node*)malloc(sizeof(struct Node)); // Allocate memory for the node
+    temp->data = data; // Assign the data
+    temp->freq = freq; // Assign the frequency
+    temp->left = temp->right = NULL; // Initialize the children as NULL
+    return temp; // Return the node
+}
+
+// A utility function to create a min heap of the given capacity
+struct MinHeap* createMinHeap(unsigned capacity)
+{
+    struct MinHeap* minHeap = (struct MinHeap*)malloc(sizeof(struct MinHeap)); // Allocate memory for the heap
+    minHeap->size = 0; // Initialize the size as 0
+    minHeap->capacity = capacity; // Assign the capacity
+    minHeap->array = (struct Node**)malloc(minHeap->capacity * sizeof(struct Node*)); // Allocate memory for the array of node pointers
+    return minHeap; // Return the heap
+}
+
+// A utility function to swap two nodes in the heap
+void swapNode(struct Node** a, struct Node** b)
+{
+    struct Node* t = *a; // Store *a in a temporary variable
+    *a = *b; // Assign *b to *a
+    *b = t; // Assign t to *b
+}
+
+// A utility function to heapify a subtree with root at given index in the heap
+void minHeapify(struct MinHeap* minHeap, int idx)
+{
+    int smallest = idx; // Initialize smallest as idx
+    int left = 2 * idx + 1; // Get the index of the left child
+    int right = 2 * idx + 2; // Get the index of the right child
+
+    // If left child is smaller than root, update smallest
+    if (left < minHeap->size && minHeap->array[left]->freq < minHeap->array[smallest]->freq)
+        smallest = left;
+
+    // If right child is smaller than smallest so far, update smallest
+    if (right < minHeap->size && minHeap->array[right]->freq < minHeap->array[smallest]->freq)
+        smallest = right;
+
+    // If smallest is not root, swap it with root and recursively heapify the affected subtree 
+    if (smallest != idx) {
+        swapNode(&minHeap->array[smallest], &minHeap->array[idx]);
+        minHeapify(minHeap, smallest);
+    }
+}
+
+// A utility function to check if the size of heap is 1 or not
+int isSizeOne(struct MinHeap* minHeap)
+{
+    return (minHeap->size == 1); // Return true if size is 1, false otherwise 
+}
+
+// A utility function to extract the minimum value node from the heap
+struct Node* extractMin(struct MinHeap* minHeap)
+{
+    struct Node* temp = minHeap->array[0]; // Store the minimum value node 
+    minHeap->array[0] = minHeap->array[minHeap->size - 1]; // Replace it with the last node 
+    --minHeap->size; // Decrease the size of heap by 1 
+    minHeapify(minHeap, 0); // Heapify the root node 
+    return temp; // Return the minimum value node 
+}
+
+// A utility function to insert a new node to the heap 
+void insertMinHeap(struct MinHeap* minHeap, struct Node* node)
+{
+    ++minHeap->size; // Increase the size of heap by 1 
+    int i = minHeap->size - 1; // Get the index of the last node 
+
+    // Find the correct position for the new node and move up the heap 
+    while (i && node->freq < minHeap->array[(i - 1) / 2]->freq) {
+        minHeap->array[i] = minHeap->array[(i - 1) / 2];
+        i = (i - 1) / 2;
+    }
+
+    minHeap->array[i] = node; // Assign the new node to its position 
+}
+
+// A utility function to build the min heap using the given array of nodes 
+void buildMinHeap(struct MinHeap* minHeap)
+{
+    int n = minHeap->size - 1; // Get the index of the last node 
+    int i; // A loop variable 
+
+    // Heapify all the internal nodes from bottom to top 
+    for (i = (n - 1) / 2; i >= 0; --i)
+        minHeapify(minHeap, i);
+}
+
+// A utility function to print the codes from the Huffman tree 
+// root is the root of the Huffman tree 
+// arr is an array to store the codes 
+// top is the index of the array 
+void printCodes(struct Node* root, int arr[], int top)
+{
+    // If left child exists, assign 0 to its edge and recur 
+    if (root->left) {
+        arr[top] = 0;
+        printCodes(root->left, arr, top + 1);
+    }
+
+    // If right child exists, assign 1 to its edge and recur 
+    if (root->right) {
+        arr[top] = 1;
+        printCodes(root->right, arr, top + 1);
+    }
+
+    // If this is a leaf node, print its data and code 
+    if (!root->left && !root->right) {
+        printf("%c: ", root->data);
+        for (int i = 0; i < top; ++i)
+            printf("%d", arr[i]);
+        printf("\n");
+    }
+}
+
+// The main function that builds the Huffman tree and prints the codes
+void HuffmanCodes(char data[], int freq[], int size)
+{
+    struct Node *left, *right, *top; // Declare three node pointers 
+
+    // Create a min heap of capacity equal to size and insert all nodes for data[] 
+    struct MinHeap* minHeap = createMinHeap(size);
+
+    for (int i = 0; i < size; ++i)
+        minHeap->array[i] = newNode(data[i], freq[i]);
+
+    minHeap->size = size;
+    buildMinHeap(minHeap);
+
+    // Iterate while the size of heap is not 1 
+    while (!isSizeOne(minHeap)) {
+        // Extract the two minimum frequency nodes from the heap 
+        left = extractMin(minHeap);
+        right = extractMin(minHeap);
+
+        // Create a new internal node with frequency equal to the sum of the two nodes frequencies. 
+        // Make the two extracted nodes as left and right children of this new node. Add this node to the heap. 
+        top = newNode('$', left->freq + right->freq); // '$' is a special value for internal nodes, not used 
+        top->left = left;
+        top->right = right;
+        insertMinHeap(minHeap, top);
+    }
+
+    // The remaining node is the root of the Huffman tree. Print the codes by traversing the tree. 
+    int arr[MAX_TREE_HT], top = 0;
+    printCodes(minHeap->array[0], arr, top);
+}

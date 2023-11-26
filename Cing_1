@@ -1,0 +1,93 @@
+//the goasl of this prgram is to serve as a referencefor future lower lvel c programs
+
+// Define a macro for the BIOS video service
+#define VIDEO_INT 0x10
+
+// Define some constants for the video service
+#define VIDEO_MODE 0x0E // 80x25 color text mode
+#define VIDEO_PAGE 0x00 // Display page to use
+#define VIDEO_COLOR 0x07 // White text on black background
+
+// Define a macro for the BIOS keyboard service
+#define KEYBOARD_INT 0x16
+
+// Define some constants for the keyboard service
+#define KEYBOARD_READ 0x00 // Read a character from the keyboard
+
+// Define a macro for the BIOS misc service
+#define MISC_INT 0x15
+
+// Define some constants for the misc service
+#define MISC_SHUTDOWN 0x5307 // Shutdown the computer
+
+// A function to print a character on the screen using BIOS interrupts
+void print_char(char c)
+{
+    // Set up the registers for the BIOS video service
+    asm volatile("movb $0x0E, %%ah;" // AH = VIDEO_MODE
+                 "movb $0x00, %%bh;" // BH = VIDEO_PAGE
+                 "movb $0x07, %%bl;" // BL = VIDEO_COLOR
+                 "movb %0, %%al;"    // AL = c
+                 "int $0x10;"        // Call VIDEO_INT
+                 :                   // No output operands
+                 : "r"(c)            // Input operand: c in any register
+                 : "ax", "bx");      // Clobbered registers
+}
+
+// A function to read a character from the keyboard using BIOS interrupts
+char read_char()
+{
+    char c;
+    // Set up the registers for the BIOS keyboard service
+    asm volatile("movb $0x00, %%ah;" // AH = KEYBOARD_READ
+                 "int $0x16;"        // Call KEYBOARD_INT
+                 "movb %%al, %0;"    // c = AL
+                 : "=r"(c)           // Output operand: c in any register
+                 :                   // No input operands
+                 : "ax");            // Clobbered register
+    return c;
+}
+
+// A function to shutdown the computer using BIOS interrupts
+void shutdown()
+{
+    // Set up the registers for the BIOS misc service
+    asm volatile("movw $0x5307, %%ax;" // AX = MISC_SHUTDOWN
+                 "movw $0x0001, %%bx;" // BX = 0001h (must be this value)
+                 "movw $0x0003, %%cx;" // CX = 0003h (must be this value)
+                 "int $0x15;"          // Call MISC_INT
+                 :                     // No output operands
+                 :                     // No input operands
+                 : "ax", "bx", "cx");  // Clobbered registers
+}
+
+// The main function of the operating system
+void main()
+{
+    char* msg = "Hello World!";   // A message to print on the screen
+    char* p = msg;                // A pointer to iterate over the message
+
+    while (*p)                    // Loop until we reach the end of the string
+    {
+        print_char(*p);           // Print the current character on the screen
+        p++;                      // Advance the pointer to the next character
+    }
+
+    print_char('\n');             // Print a newline character
+
+    while (1)                     // Loop forever until we press 'q'
+    {
+        char c = read_char();     // Read a character from the keyboard
+
+        if (c == 'q')             // If we press 'q', then exit the loop and shutdown 
+        {
+            break;
+        }
+        else                      // Otherwise, echo the character back to the screen 
+        {
+            print_char(c);
+        }
+    }
+
+    shutdown();                   // Shutdown the computer gracefully 
+
